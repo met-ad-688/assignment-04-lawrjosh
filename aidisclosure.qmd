@@ -1,0 +1,170 @@
+# AI Prompt
+
+I am in an EC2 instance in visual studio code in a jupyter notebook I am receiving the following error. 
+
+
+import os
+import sys
+# Set Java home if needed (adjust path to your Java installation)
+os.environ['JAVA_HOME'] = '/usr/lib/jvm/java-11-openjdk-amd64' 
+os.environ['PATH'] = os.path.join(os.environ['JAVA_HOME'], 'bin') + ':' + os.environ.get('PATH', '')
+from pyspark.sql import SparkSession
+import pandas as pd
+import plotly.express as px
+import plotly.io as pio
+import numpy as np
+np.random.seed(42)
+pio.renderers.default = "notebook+notebook_connected+vscode"
+# Initialize Spark Session
+spark = SparkSession.builder.appName("LightcastData").getOrCreate()
+# Load Data
+df = spark.read.option("header", "true").option("inferSchema", "true").option("multiLine","true").option("escape", "\"").csv("../data/lightcast_job_postings.csv")
+# Show Schema and Sample Data
+print("---This is Diagnostic check, No need to print it in the final doc---")
+# df.printSchema() # comment this line when rendering the submission
+df.show(5)  ---------------------------------------------------------------------------
+PySparkRuntimeError                       Traceback (most recent call last)
+Cell In[1], line 19
+     16 pio.renderers.default = "notebook+notebook_connected+vscode"
+     18 # Initialize Spark Session
+---> 19 spark = SparkSession.builder.appName("LightcastData").getOrCreate()
+     21 # Load Data
+     22 df = spark.read.option("header", "true").option("inferSchema", "true").option("multiLine","true").option("escape", "\"").csv("../data/lightcast_job_postings.csv")
+File ~/assignment-04-lawrjosh/.venv/lib/python3.12/site-packages/pyspark/sql/session.py:497, in SparkSession.Builder.getOrCreate(self)
+    495     sparkConf.set(key, value)
+    496 # This SparkContext may be an existing one.
+--> 497 sc = SparkContext.getOrCreate(sparkConf)
+    498 # Do not update SparkConf for existing SparkContext, as it's shared
+    499 # by all sessions.
+    500 session = SparkSession(sc, options=self._options)
+File ~/assignment-04-lawrjosh/.venv/lib/python3.12/site-packages/pyspark/context.py:515, in SparkContext.getOrCreate(cls, conf)
+    513 with SparkContext._lock:
+    514     if SparkContext._active_spark_context is None:
+--> 515         SparkContext(conf=conf or SparkConf())
+    516     assert SparkContext._active_spark_context is not None
+    517     return SparkContext._active_spark_context
+File ~/assignment-04-lawrjosh/.venv/lib/python3.12/site-packages/pyspark/context.py:201, in SparkContext.__init__(self, master, appName, sparkHome, pyFiles, environment, batchSize, serializer, conf, gateway, jsc, profiler_cls, udf_profiler_cls, memory_profiler_cls)
+    195 if gateway is not None and gateway.gateway_parameters.auth_token is None:
+    196     raise ValueError(
+    197         "You are trying to pass an insecure Py4j gateway to Spark. This"
+    198         " is not allowed as it is a security risk."
+    199     )
+--> 201 SparkContext._ensure_initialized(self, gateway=gateway, conf=conf)
+    202 try:
+    203     self._do_init(
+    204         master,
+    205         appName,
+   (...)    215         memory_profiler_cls,
+    216     )
+File ~/assignment-04-lawrjosh/.venv/lib/python3.12/site-packages/pyspark/context.py:436, in SparkContext._ensure_initialized(cls, instance, gateway, conf)
+    434 with SparkContext._lock:
+    435     if not SparkContext._gateway:
+--> 436         SparkContext._gateway = gateway or launch_gateway(conf)
+    437         SparkContext._jvm = SparkContext._gateway.jvm
+    439     if instance:
+File ~/assignment-04-lawrjosh/.venv/lib/python3.12/site-packages/pyspark/java_gateway.py:107, in launch_gateway(conf, popen_kwargs)
+    104     time.sleep(0.1)
+    106 if not os.path.isfile(conn_info_file):
+--> 107     raise PySparkRuntimeError(
+    108         error_class="JAVA_GATEWAY_EXITED",
+    109         message_parameters={},
+    110     )
+    112 with open(conn_info_file, "rb") as info:
+    113     gateway_port = read_int(info)
+PySparkRuntimeError: [JAVA_GATEWAY_EXITED] Java gateway process exited before sending its port number.This error indicates that PySpark is unable to start the Java gateway process. Here are the most common causes and solutions:
+
+# AI Response/Feedback
+Quick Fixes to Try
+1. Verify Java Installation
+First, check if Java is actually installed and accessible:
+bashjava -version
+echo $JAVA_HOME
+ls -la /usr/lib/jvm/java-11-openjdk-amd64
+2. Fix the PATH Setting
+Your PATH configuration is incorrect. It should append to the existing PATH, not replace it:
+pythonimport os
+import sys
+
+## Set Java home
+os.environ['JAVA_HOME'] = '/usr/lib/jvm/java-11-openjdk-amd64'
+os.environ['PATH'] = os.path.join(os.environ['JAVA_HOME'], 'bin') + ':' + os.environ.get('PATH', '')
+
+## Verify Java is accessible
+import subprocess
+try:
+    result = subprocess.run(['java', '-version'], capture_output=True, text=True)
+    print("Java check:", result.stderr)
+except Exception as e:
+    print("Java not found:", e)
+3. Install Java if Missing
+If Java isn't installed, run this in your EC2 terminal:
+bashsudo apt-get update
+sudo apt-get install -y openjdk-11-jdk
+4. Set PYSPARK_PYTHON and PYSPARK_DRIVER_PYTHON
+Add these environment variables before creating SparkSession:
+pythonimport os
+import sys
+
+## Java configuration
+os.environ['JAVA_HOME'] = '/usr/lib/jvm/java-11-openjdk-amd64'
+os.environ['PATH'] = os.path.join(os.environ['JAVA_HOME'], 'bin') + ':' + os.environ.get('PATH', '')
+
+## Python configuration for PySpark
+os.environ['PYSPARK_PYTHON'] = sys.executable
+os.environ['PYSPARK_DRIVER_PYTHON'] = sys.executable
+
+from pyspark.sql import SparkSession
+5. Check for Memory Issues
+EC2 instances with low memory might fail to start Spark. Try limiting Spark's memory:
+pythonspark = SparkSession.builder \
+    .appName("LightcastData") \
+    .config("spark.driver.memory", "1g") \
+    .config("spark.executor.memory", "1g") \
+    .getOrCreate()
+6. Check PySpark Installation
+Ensure PySpark is properly installed in your virtual environment:
+bashpip install --upgrade pyspark
+Most Likely Solution
+Based on your error, the most common issue is that Java isn't installed or isn't at the specified path. Try this complete solution:
+pythonimport os
+import sys
+import subprocess
+
+## Try to find Java automatically
+def find_java_home():
+    try:
+        # Try common locations
+        java_homes = [
+            '/usr/lib/jvm/java-11-openjdk-amd64',
+            '/usr/lib/jvm/java-11',
+            '/usr/lib/jvm/default-java',
+        ]
+        for home in java_homes:
+            if os.path.exists(home):
+                return home
+    except:
+        pass
+    return None
+
+java_home = find_java_home()
+if java_home:
+    os.environ['JAVA_HOME'] = java_home
+    os.environ['PATH'] = os.path.join(java_home, 'bin') + ':' + os.environ.get('PATH', '')
+    print(f"Using Java at: {java_home}")
+else:
+    print("Java not found! Install with: sudo apt-get install -y openjdk-11-jdk")
+
+os.environ['PYSPARK_PYTHON'] = sys.executable
+os.environ['PYSPARK_DRIVER_PYTHON'] = sys.executable
+
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder \
+    .appName("LightcastData") \
+    .config("spark.driver.memory", "2g") \
+    .getOrCreate()
+Run the Java verification commands first to diagnose the exact issue!
+
+
+# Explanation of use
+Used Claude AI to troubleshoot issue with intializing pyspark, was ultimately able to resolve by restarting VS Code after reinstalling pyspark. 
